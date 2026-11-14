@@ -1,0 +1,12 @@
+# Any key set here overrides the matching CLI flag.
+listen_address: ":9102"
+metrics_path: "/metrics"
+log_level: info
+scrape_timeout: 60s
+
+cloud: public                      # public | china | usgov
+tenant_id: "00000000-0000-0000-0000-000000000000"
+client_id: "00000000-0000-0000-0000-000000000000"
+client_secret: "REPLACE_ME"        # or omit and use $AZURE_CLIENT_SECRET
+
+cache_max_age: 10m                 # served ONLY while Graph answers 429; 0 disables
