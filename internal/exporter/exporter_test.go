@@ -237,7 +237,7 @@ func TestNoApplications(t *testing.T) {
 }
 
 // With LatestCredentialsOnly, each app keeps only its latest secret and latest
-// certificate; credentials_count still reports everything.
+// certificate, and credentials_count matches what is exported.
 func TestLatestCredentialsOnly(t *testing.T) {
 	d := func(y int, m time.Month) time.Time { return time.Date(y, m, 1, 0, 0, 0, 0, time.UTC) }
 	apps := []graph.Application{
@@ -289,7 +289,9 @@ func TestLatestCredentialsOnly(t *testing.T) {
 	if n := len(m[mCertExp]); n != 1 || m[mCertExp][0].labels["certificate_id"] != "cert-new" {
 		t.Errorf("certificate series = %+v, want only cert-new", m[mCertExp])
 	}
-	expect(t, "secret count is unfiltered", valueOf(t, m[mCredsCount], map[string]string{"app_id": "app-1", "type": "secret"}), 3)
+	expect(t, "secret count after filtering", valueOf(t, m[mCredsCount], map[string]string{"app_id": "app-1", "type": "secret"}), 1)
+	expect(t, "certificate count after filtering", valueOf(t, m[mCredsCount], map[string]string{"app_id": "app-1", "type": "certificate"}), 1)
+	expect(t, "tied secrets are both counted", valueOf(t, m[mCredsCount], map[string]string{"app_id": "app-3", "type": "secret"}), 2)
 }
 
 // Default behaviour (option off) is unchanged: every credential is exported.

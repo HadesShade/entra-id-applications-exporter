@@ -114,7 +114,7 @@ All metrics are gauges. Timestamps are Unix time in seconds.
 | `azure_entra_application_info` | `app_id`, `object_id`, `app_name`, `sign_in_audience` | Always `1`. Carries the application's metadata as labels. |
 | `azure_entra_application_secret_expiration_timestamp_seconds` | `app_id`, `app_name`, `secret_id`, `secret_name` | Expiry time of one client secret. One series per secret (only the latest per application with [`latest_credentials_only`](#hiding-superseded-credentials)). `secret_name` is the secret's description in Entra (may be empty). |
 | `azure_entra_application_certificate_expiration_timestamp_seconds` | `app_id`, `app_name`, `certificate_id`, `certificate_name` | Expiry time of one certificate. One series per certificate (only the latest per application with [`latest_credentials_only`](#hiding-superseded-credentials)). `certificate_name` is the certificate's description in Entra (may be empty). |
-| `azure_entra_application_credentials_count` | `app_id`, `app_name`, `type` (`secret` or `certificate`) | Number of credentials of each type in Entra. Both types are always emitted, `0` included. Never filtered by `latest_credentials_only`. |
+| `azure_entra_application_credentials_count` | `app_id`, `app_name`, `type` (`secret` or `certificate`) | Number of credentials of each type. Both types are always emitted, `0` included. With `latest_credentials_only`, it counts only the credentials that are exported. |
 | `azure_entra_application_owners_count` | `app_id`, `app_name` | Number of owners assigned to the application. |
 | `azure_entra_application_created_timestamp_seconds` | `app_id` | Creation time of the application registration. |
 | `azure_entra_applications_count` | none | Total number of application registrations in the tenant. |
@@ -208,8 +208,8 @@ expires last:
 - Credentials with the exact same expiry are all kept.
 - If every credential of an app is expired, the latest expired one is still
   exported, so the app keeps alerting.
-- `azure_entra_application_credentials_count` is not filtered: it still counts every
-  credential in Entra, so you can track cleanup.
+- `azure_entra_application_credentials_count` follows the filter: it counts only the
+  credentials that are exported, so it always matches the expiry series.
 
 Example:
 
@@ -306,7 +306,7 @@ is emitted but not described.
 ### Building a release
 
 ```sh
-make release VERSION=v0.2.0
+make release VERSION=v0.2.1
 ```
 
 This writes `linux/amd64` and `linux/arm64` archives plus `checksums.txt` to `dist/`,
@@ -319,4 +319,4 @@ pull request, and include a test for new metrics or behavior.
 
 ## License
 
-[MIT](LICENSE) © 2026 Kevin Tim
+[MIT](LICENSE) © 2026 HadesShade

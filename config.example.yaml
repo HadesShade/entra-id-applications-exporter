@@ -13,5 +13,5 @@ cache_max_age: 10m                 # served ONLY while Graph answers 429; 0 disa
 
 # Per application, export expiry metrics only for the latest secret and the
 # latest certificate (the ones expiring last). Hides old credentials that were
-# never removed in Entra. credentials_count still counts all of them.
+# never removed in Entra. credentials_count then counts only what is exported.
 latest_credentials_only: false

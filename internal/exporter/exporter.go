@@ -162,12 +162,12 @@ func (e *Exporter) emit(ch chan<- prometheus.Metric, apps []graph.Application) {
 
 		ch <- prometheus.MustNewConstMetric(
 			e.credentialsCount, prometheus.GaugeValue,
-			float64(len(app.Secrets)), app.AppID, app.Name, "secret",
+			float64(len(secrets)), app.AppID, app.Name, "secret",
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			e.credentialsCount, prometheus.GaugeValue,
-			float64(len(app.Certificates)), app.AppID, app.Name, "certificate",
+			float64(len(certificates)), app.AppID, app.Name, "certificate",
 		)
 
 		ch <- prometheus.MustNewConstMetric(
