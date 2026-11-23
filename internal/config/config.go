@@ -37,6 +37,11 @@ type Config struct {
 	// CacheMaxAge: the last good result is served for up to this long, but ONLY
 	// while Graph answers 429 (throttled). 0 disables the cache.
 	CacheMaxAge time.Duration `yaml:"cache_max_age"`
+
+	// LatestCredentialsOnly: per application, export expiry metrics only for the
+	// secret and the certificate that expire last. Older (superseded) credentials
+	// that were never removed in Entra are left out.
+	LatestCredentialsOnly bool `yaml:"latest_credentials_only"`
 }
 
 // Load parses args (usually os.Args[1:]), then applies the config file if any.
@@ -58,6 +63,9 @@ func Load(args []string) (*Config, error) {
 
 	fs.DurationVar(&cfg.CacheMaxAge, "cache-max-age", 10*time.Minute,
 		"Max age of cached data served while Graph is throttling (429). 0 disables the cache.")
+
+	fs.BoolVar(&cfg.LatestCredentialsOnly, "latest-credentials-only", false,
+		"Per application, export expiry metrics only for the latest secret and the latest certificate (the ones expiring last).")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err

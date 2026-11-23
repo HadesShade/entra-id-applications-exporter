@@ -23,6 +23,10 @@ type AppLister interface {
 type Options struct {
 	ScrapeTimeout time.Duration
 	CacheMaxAge   time.Duration // 0 disables the cache
+
+	// LatestCredentialsOnly limits the expiry metrics to the latest secret and
+	// the latest certificate of each application.
+	LatestCredentialsOnly bool
 }
 
 type Exporter struct {
@@ -79,6 +83,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 		e.applicationInfo,
 		e.secretExpiry,
 		e.certificateExpiry,
+		e.credentialsCount,
 		e.ownersCount,
 		e.createdTimestamp,
 		e.applicationsCount,
@@ -129,7 +134,12 @@ func (e *Exporter) load(ctx context.Context) ([]graph.Application, time.Duration
 func (e *Exporter) emit(ch chan<- prometheus.Metric, apps []graph.Application) {
 	applicationsCount := 0
 	for _, app := range apps {
-		for _, secret := range app.Secrets {
+		secrets, certificates := app.Secrets, app.Certificates
+		if e.opts.LatestCredentialsOnly {
+			secrets, certificates = latestOnly(secrets), latestOnly(certificates)
+		}
+
+		for _, secret := range secrets {
 			ch <- prometheus.MustNewConstMetric(
 				e.secretExpiry, prometheus.GaugeValue,
 				float64(secret.ExpiryTime.Unix()),
@@ -137,7 +147,7 @@ func (e *Exporter) emit(ch chan<- prometheus.Metric, apps []graph.Application) {
 			)
 		}
 
-		for _, certificate := range app.Certificates {
+		for _, certificate := range certificates {
 			ch <- prometheus.MustNewConstMetric(
 				e.certificateExpiry, prometheus.GaugeValue,
 				float64(certificate.ExpiryTime.Unix()),
@@ -177,4 +187,28 @@ func (e *Exporter) emit(ch chan<- prometheus.Metric, apps []graph.Application) {
 		e.applicationsCount, prometheus.GaugeValue,
 		float64(applicationsCount),
 	)
+}
+
+// latestOnly returns the credentials that expire last. Credentials sharing the
+// exact same expiry are all kept: nothing is hidden when "latest" is ambiguous.
+// If every credential is expired, the latest expired one is still returned, so
+// an application with only dead credentials keeps alerting.
+// credentials_count is not affected: it keeps reporting what exists in Entra.
+func latestOnly(creds []graph.Credential) []graph.Credential {
+	if len(creds) <= 1 {
+		return creds
+	}
+	latest := creds[0].ExpiryTime
+	for _, c := range creds[1:] {
+		if c.ExpiryTime.After(latest) {
+			latest = c.ExpiryTime
+		}
+	}
+	out := make([]graph.Credential, 0, 1)
+	for _, c := range creds {
+		if c.ExpiryTime.Equal(latest) {
+			out = append(out, c)
+		}
+	}
+	return out
 }

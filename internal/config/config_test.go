@@ -39,3 +39,27 @@ func TestInvalidCloud(t *testing.T) {
 		t.Fatal("expected error for invalid cloud")
 	}
 }
+
+func TestLatestCredentialsOnly(t *testing.T) {
+	base := []string{"--tenant-id", "t", "--client-id", "c", "--client-secret", "s"}
+
+	cfg, err := Load(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.LatestCredentialsOnly {
+		t.Error("latest_credentials_only must default to false")
+	}
+
+	p := filepath.Join(t.TempDir(), "c.yaml")
+	if err := os.WriteFile(p, []byte("latest_credentials_only: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load(append(base, "--config-file", p))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.LatestCredentialsOnly {
+		t.Error("latest_credentials_only: true in the file must enable the option")
+	}
+}

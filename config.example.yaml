@@ -10,3 +10,8 @@ client_id: "00000000-0000-0000-0000-000000000000"
 client_secret: "REPLACE_ME"        # or omit and use $AZURE_CLIENT_SECRET
 
 cache_max_age: 10m                 # served ONLY while Graph answers 429; 0 disables
+
+# Per application, export expiry metrics only for the latest secret and the
+# latest certificate (the ones expiring last). Hides old credentials that were
+# never removed in Entra. credentials_count still counts all of them.
+latest_credentials_only: false

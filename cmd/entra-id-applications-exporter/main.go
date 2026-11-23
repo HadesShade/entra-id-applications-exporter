@@ -55,7 +55,7 @@ func run() error {
 	reg.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		exporter.New(gc, exporter.Options{ScrapeTimeout: cfg.ScrapeTimeout, CacheMaxAge: cfg.CacheMaxAge}, logger),
+		exporter.New(gc, exporter.Options{ScrapeTimeout: cfg.ScrapeTimeout, CacheMaxAge: cfg.CacheMaxAge, LatestCredentialsOnly: cfg.LatestCredentialsOnly}, logger),
 	)
 
 	mux := http.NewServeMux()

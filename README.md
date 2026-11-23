@@ -101,6 +101,7 @@ matching flag. Unknown keys in the file are rejected.
 | `client_id` / `--client-id` | `$AZURE_CLIENT_ID` | Service principal application (client) ID. Required. |
 | `client_secret` / `--client-secret` | `$AZURE_CLIENT_SECRET` | Service principal secret. Required. Prefer the env var or the config file: CLI arguments are visible in `ps`. |
 | `cache_max_age` / `--cache-max-age` | `10m` | How long cached data may be served while Graph answers 429. `0` disables the cache. |
+| `latest_credentials_only` / `--latest-credentials-only` | `false` | Per application, export expiry metrics only for the latest secret and the latest certificate (the ones expiring last). See [Hiding superseded credentials](#hiding-superseded-credentials). |
 
 The exporter also serves `GET /healthz`, which returns `ok`.
 
@@ -111,9 +112,9 @@ All metrics are gauges. Timestamps are Unix time in seconds.
 | Metric | Labels | Description |
 |---|---|---|
 | `azure_entra_application_info` | `app_id`, `object_id`, `app_name`, `sign_in_audience` | Always `1`. Carries the application's metadata as labels. |
-| `azure_entra_application_secret_expiration_timestamp_seconds` | `app_id`, `app_name`, `secret_id`, `secret_name` | Expiry time of one client secret. One series per secret. `secret_name` is the secret's description in Entra (may be empty). |
-| `azure_entra_application_certificate_expiration_timestamp_seconds` | `app_id`, `app_name`, `certificate_id`, `certificate_name` | Expiry time of one certificate. One series per certificate. `certificate_name` is the certificate's description in Entra (may be empty). |
-| `azure_entra_application_credentials_count` | `app_id`, `app_name`, `type` (`secret` or `certificate`) | Number of credentials of each type. Both types are always emitted, `0` included. |
+| `azure_entra_application_secret_expiration_timestamp_seconds` | `app_id`, `app_name`, `secret_id`, `secret_name` | Expiry time of one client secret. One series per secret (only the latest per application with [`latest_credentials_only`](#hiding-superseded-credentials)). `secret_name` is the secret's description in Entra (may be empty). |
+| `azure_entra_application_certificate_expiration_timestamp_seconds` | `app_id`, `app_name`, `certificate_id`, `certificate_name` | Expiry time of one certificate. One series per certificate (only the latest per application with [`latest_credentials_only`](#hiding-superseded-credentials)). `certificate_name` is the certificate's description in Entra (may be empty). |
+| `azure_entra_application_credentials_count` | `app_id`, `app_name`, `type` (`secret` or `certificate`) | Number of credentials of each type in Entra. Both types are always emitted, `0` included. Never filtered by `latest_credentials_only`. |
 | `azure_entra_application_owners_count` | `app_id`, `app_name` | Number of owners assigned to the application. |
 | `azure_entra_application_created_timestamp_seconds` | `app_id` | Creation time of the application registration. |
 | `azure_entra_applications_count` | none | Total number of application registrations in the tenant. |
@@ -129,7 +130,8 @@ Exporter health:
 Notes:
 
 - Credentials that are already expired are still reported, with an expiry in the
-  past. Credentials without an end date are skipped.
+  past, unless [`latest_credentials_only`](#hiding-superseded-credentials) hides the
+  superseded ones. Credentials without an end date are skipped.
 - `app_name` is the application's display name and can change. `app_id` is the
   stable identifier.
 - `secret_name` and `certificate_name` are the credential's description as shown in
@@ -190,7 +192,34 @@ groups:
 
 Expired credentials stay in the output, so the "expiring soon" rules also match
 credentials that already expired. Silence old, unused credentials by deleting them
-in Entra.
+in Entra, or hide superseded ones with
+[`latest_credentials_only`](#hiding-superseded-credentials).
+
+## Hiding superseded credentials
+
+Many tenants never delete old secrets and certificates, so expired ones keep
+triggering "expired" and "expiring soon" alerts even though the application was
+already rotated to a newer credential. With `latest_credentials_only: true`, the
+exporter keeps, **per application and per type**, only the credential that
+expires last:
+
+- Secrets and certificates are handled separately: an app keeps its latest secret
+  and its latest certificate.
+- Credentials with the exact same expiry are all kept.
+- If every credential of an app is expired, the latest expired one is still
+  exported, so the app keeps alerting.
+- `azure_entra_application_credentials_count` is not filtered: it still counts every
+  credential in Entra, so you can track cleanup.
+
+Example:
+
+```yaml
+latest_credentials_only: true
+```
+
+Caveat: if a new credential is added before the workload uses it, the older
+credential that is still in use stops being monitored. Rotate promptly, or leave
+this option off. The best long-term fix is still to delete old credentials in Entra.
 
 ## Prometheus scrape config
 
@@ -277,7 +306,7 @@ is emitted but not described.
 ### Building a release
 
 ```sh
-make release VERSION=v0.1.0
+make release VERSION=v0.2.0
 ```
 
 This writes `linux/amd64` and `linux/arm64` archives plus `checksums.txt` to `dist/`,
@@ -290,4 +319,4 @@ pull request, and include a test for new metrics or behavior.
 
 ## License
 
-[MIT](LICENSE) © 2026 HadesShade
+[MIT](LICENSE) © 2026 Kevin Tim

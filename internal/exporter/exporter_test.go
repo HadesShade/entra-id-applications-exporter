@@ -235,3 +235,74 @@ func TestNoApplications(t *testing.T) {
 		}
 	}
 }
+
+// With LatestCredentialsOnly, each app keeps only its latest secret and latest
+// certificate; credentials_count still reports everything.
+func TestLatestCredentialsOnly(t *testing.T) {
+	d := func(y int, m time.Month) time.Time { return time.Date(y, m, 1, 0, 0, 0, 0, time.UTC) }
+	apps := []graph.Application{
+		{
+			AppID: "app-1", Name: "rotated-app",
+			Secrets: []graph.Credential{
+				{KeyID: "old", ExpiryTime: d(2024, 1)},
+				{KeyID: "new", ExpiryTime: d(2027, 1)},
+				{KeyID: "mid", ExpiryTime: d(2025, 6)},
+			},
+			Certificates: []graph.Credential{
+				{KeyID: "cert-old", ExpiryTime: d(2024, 3)},
+				{KeyID: "cert-new", ExpiryTime: d(2028, 3)},
+			},
+		},
+		{ // every credential expired: the latest one must still be reported
+			AppID: "app-2", Name: "dead-app",
+			Secrets: []graph.Credential{
+				{KeyID: "d1", ExpiryTime: d(2023, 1)},
+				{KeyID: "d2", ExpiryTime: d(2024, 1)},
+			},
+		},
+		{ // identical expiry: nothing is hidden
+			AppID: "app-3", Name: "tie-app",
+			Secrets: []graph.Credential{
+				{KeyID: "t1", ExpiryTime: d(2027, 5)},
+				{KeyID: "t2", ExpiryTime: d(2027, 5)},
+			},
+		},
+	}
+	e := New(fixedLister{apps}, Options{ScrapeTimeout: time.Second, LatestCredentialsOnly: true},
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	m := gather(t, e)
+
+	ids := map[string]bool{}
+	for _, s := range m[mSecretExp] {
+		ids[s.labels["secret_id"]] = true
+	}
+	for _, want := range []string{"new", "d2", "t1", "t2"} {
+		if !ids[want] {
+			t.Errorf("secret %q should be exported, got %v", want, ids)
+		}
+	}
+	for _, gone := range []string{"old", "mid", "d1"} {
+		if ids[gone] {
+			t.Errorf("secret %q is superseded and must not be exported", gone)
+		}
+	}
+	if n := len(m[mCertExp]); n != 1 || m[mCertExp][0].labels["certificate_id"] != "cert-new" {
+		t.Errorf("certificate series = %+v, want only cert-new", m[mCertExp])
+	}
+	expect(t, "secret count is unfiltered", valueOf(t, m[mCredsCount], map[string]string{"app_id": "app-1", "type": "secret"}), 3)
+}
+
+// Default behaviour (option off) is unchanged: every credential is exported.
+func TestAllCredentialsByDefault(t *testing.T) {
+	apps := []graph.Application{{
+		AppID: "a", Name: "n",
+		Secrets: []graph.Credential{
+			{KeyID: "s1", ExpiryTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+			{KeyID: "s2", ExpiryTime: time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)},
+		},
+	}}
+	m := gather(t, newTestExporter(fixedLister{apps}))
+	if n := len(m[mSecretExp]); n != 2 {
+		t.Errorf("secret series = %d, want 2", n)
+	}
+}
