@@ -319,4 +319,4 @@ pull request, and include a test for new metrics or behavior.
 
 ## License
 
-[MIT](LICENSE) © 2026 HadesShade
+[MIT](LICENSE) © 2026 Kevin Tim
